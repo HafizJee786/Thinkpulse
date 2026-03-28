@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AI Research Assistant</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    body { background-color: #EBF3FB; }
+    .navy { background-color: #1B3A6B; }
+    .navy-text { color: #1B3A6B; }
+    .light-blue { background-color: #D6E8F7; }
+    .card { background: white; border-radius: 16px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
+    .btn-navy { background-color: #1B3A6B; color: white; border-radius: 50px; transition: all 0.3s; }
+    .btn-navy:hover { background-color: #142d54; transform: translateY(-1px); }
+    .btn-outline { border: 2px solid #1B3A6B; color: #1B3A6B; border-radius: 50px; transition: all 0.3s; }
+    .btn-outline:hover { background-color: #1B3A6B; color: white; }
+    .depth-btn { border: 2px solid #D6E8F7; background: #D6E8F7; color: #1B3A6B; border-radius: 50px; transition: all 0.3s; }
+    .depth-btn.active { background-color: #1B3A6B; color: white; border-color: #1B3A6B; }
+    .report-content h1, .report-content h2, .report-content h3 { color: #1B3A6B; font-weight: bold; margin: 16px 0 8px; }
+    .report-content h2 { font-size: 1.2rem; border-bottom: 2px solid #D6E8F7; padding-bottom: 4px; }
+    .report-content p { margin: 8px 0; line-height: 1.7; color: #374151; }
+    .report-content ul, .report-content ol { margin: 8px 0 8px 24px; color: #374151; }
+    .report-content li { margin: 4px 0; }
+    .spinner { border: 3px solid #D6E8F7; border-top: 3px solid #1B3A6B; border-radius: 50%; width: 32px; height: 32px; animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .history-card:hover { background-color: #EBF3FB; cursor: pointer; }
+    .tag { background: #D6E8F7; color: #1B3A6B; border-radius: 50px; padding: 2px 12px; font-size: 0.75rem; font-weight: 600; }
+  </style>
+</head>
+<body class="min-h-screen">
+
+  <!-- Header -->
+  <div class="navy text-white py-6 px-6 shadow-lg">
+    <div class="max-w-6xl mx-auto flex items-center justify-between">
+      <div>
+        <h1 class="text-2xl font-bold">ThinkPulse</h1>
+        <p style="color:#A8C4E0;" class="text-sm mt-1">Intelligence at your fingertips</p>
+      </div>
+      <div class="text-right">
+        <span class="tag" style="background:#D6E8F7;color:#1B3A6B;">Made by Hasnain</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="max-w-6xl mx-auto px-4 py-8">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+      <!-- Left Panel: Search + Results -->
+      <div class="lg:col-span-2 space-y-6">
+
+        <!-- Search Card -->
+        <div class="card p-6">
+          <h2 class="navy-text font-bold text-lg mb-4">Research a Topic</h2>
+
+          <!-- Topic Input -->
+          <div class="mb-4">
+            <label class="block navy-text font-semibold text-sm mb-2">Topic</label>
+            <input id="topic-input" type="text"
+              placeholder="e.g. Artificial Intelligence in Healthcare..."
+              class="w-full border-2 border-blue-100 rounded-xl px-4 py-3 text-gray-700 focus:outline-none focus:border-blue-300"
+              onkeypress="if(event.key==='Enter') startResearch()"/>
+          </div>
+
+          <!-- Depth Selector -->
+          <div class="mb-6">
+            <label class="block navy-text font-semibold text-sm mb-2">Research Depth</label>
+            <div class="flex gap-3">
+              <button onclick="setDepth('quick')" id="depth-quick" class="depth-btn px-5 py-2 font-semibold text-sm">Quick</button>
+              <button onclick="setDepth('standard')" id="depth-standard" class="depth-btn active px-5 py-2 font-semibold text-sm">Standard</button>
+              <button onclick="setDepth('deep')" id="depth-deep" class="depth-btn px-5 py-2 font-semibold text-sm">Deep</button>
+            </div>
+            <p id="depth-desc" class="text-gray-500 text-xs mt-2">Standard: 3 searches, well-structured report</p>
+          </div>
+
+          <!-- Search Button -->
+          <button onclick="startResearch()" id="search-btn"
+            class="btn-navy w-full py-3 font-bold text-lg">
+            Research Now
+          </button>
+        </div>
+
+        <!-- Loading Card -->
+        <div id="loading-card" class="card p-8 hidden">
+          <div class="flex flex-col items-center justify-center text-center">
+            <div class="spinner mb-4"></div>
+            <h3 class="navy-text font-bold text-lg mb-2">Researching your topic...</h3>
+            <p class="text-gray-500 text-sm" id="loading-text">Searching the web for relevant information</p>
+          </div>
+        </div>
+
+        <!-- Result Card -->
+        <div id="result-card" class="card p-6 hidden">
+
+          <!-- Result Header -->
+          <div class="flex justify-between items-start mb-4">
+            <div>
+              <h2 class="navy-text font-bold text-xl" id="result-topic"></h2>
+              <div class="flex gap-2 mt-2">
+                <span class="tag" id="result-depth"></span>
+                <span class="tag" id="result-time"></span>
+              </div>
+            </div>
+            <div class="flex gap-2">
+              <button onclick="copyReport()" class="btn-outline px-4 py-2 text-sm font-semibold">Copy</button>
+              <button onclick="downloadReport()" class="btn-navy px-4 py-2 text-sm font-semibold">Download</button>
+            </div>
+          </div>
+
+          <!-- Divider -->
+          <div style="border-top: 2px solid #D6E8F7;" class="mb-4"></div>
+
+          <!-- Report Content -->
+          <div id="report-content" class="report-content"></div>
+        </div>
+
+      </div>
+
+      <!-- Right Panel: History -->
+      <div class="lg:col-span-1">
+        <div class="card p-5">
+          <div class="flex justify-between items-center mb-4">
+            <h2 class="navy-text font-bold text-lg">Research History</h2>
+            <button onclick="clearHistory()" class="text-red-400 text-xs font-semibold hover:text-red-600">Clear All</button>
+          </div>
+
+          <div id="history-list">
+            <div class="text-center text-gray-400 text-sm py-8">
+              No research history yet.
+              <br>Start researching a topic!
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+<script>
+  let currentDepth = 'standard';
+  let currentReport = '';
+  let currentTopic = '';
+
+  const depthDescriptions = {
+    quick: 'Quick: 1 search, brief 2-3 paragraph overview',
+    standard: 'Standard: 3 searches, well-structured report',
+    deep: 'Deep: 5 searches, comprehensive detailed report'
+  };
+
+  function setDepth(depth) {
+    currentDepth = depth;
+    document.querySelectorAll('.depth-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('depth-' + depth).classList.add('active');
+    document.getElementById('depth-desc').textContent = depthDescriptions[depth];
+  }
+
+  const loadingMessages = [
+    'Searching the web for relevant information...',
+    'Analyzing sources and gathering data...',
+    'Synthesizing findings into a report...',
+    'Formatting your research report...'
+  ];
+
+  let loadingInterval;
+
+  function startLoadingMessages() {
+    let i = 0;
+    document.getElementById('loading-text').textContent = loadingMessages[0];
+    loadingInterval = setInterval(() => {
+      i = (i + 1) % loadingMessages.length;
+      document.getElementById('loading-text').textContent = loadingMessages[i];
+    }, 4000);
+  }
+
+  function stopLoadingMessages() {
+    clearInterval(loadingInterval);
+  }
+
+  async function startResearch() {
+    const topic = document.getElementById('topic-input').value.trim();
+    if (!topic) { alert('Please enter a topic to research!'); return; }
+
+    currentTopic = topic;
+
+    // Show loading
+    document.getElementById('loading-card').classList.remove('hidden');
+    document.getElementById('result-card').classList.add('hidden');
+    document.getElementById('search-btn').disabled = true;
+    document.getElementById('search-btn').textContent = 'Researching...';
+    startLoadingMessages();
+
+    const formData = new FormData();
+    formData.append('topic', topic);
+    formData.append('depth', currentDepth);
+
+    try {
+      const res = await fetch('/research', { method: 'POST', body: formData });
+      const data = await res.json();
+
+      stopLoadingMessages();
+      document.getElementById('loading-card').classList.add('hidden');
+
+      if (data.error) {
+        alert('Error: ' + data.error);
+        return;
+      }
+
+      currentReport = data.report;
+      displayResult(data);
+      loadHistory();
+
+    } catch(err) {
+      stopLoadingMessages();
+      document.getElementById('loading-card').classList.add('hidden');
+      alert('Error: ' + err.message);
+    } finally {
+      document.getElementById('search-btn').disabled = false;
+      document.getElementById('search-btn').textContent = 'Research Now';
+    }
+  }
+
+  function displayResult(data) {
+    document.getElementById('result-card').classList.remove('hidden');
+    document.getElementById('result-topic').textContent = data.topic;
+    document.getElementById('result-depth').textContent = data.depth.charAt(0).toUpperCase() + data.depth.slice(1) + ' Research';
+    document.getElementById('result-time').textContent = data.timestamp;
+    document.getElementById('report-content').innerHTML = marked.parse(data.report);
+    document.getElementById('result-card').scrollIntoView({ behavior: 'smooth' });
+  }
+
+  async function loadHistory() {
+    try {
+      const res = await fetch('/history');
+      const data = await res.json();
+      const list = document.getElementById('history-list');
+
+      if (data.history.length === 0) {
+        list.innerHTML = '<div class="text-center text-gray-400 text-sm py-8">No research history yet.</div>';
+        return;
+      }
+
+      list.innerHTML = data.history.map(h => `
+        <div class="history-card p-3 rounded-xl mb-2 border border-blue-50" onclick="loadHistoryItem(${h.id})">
+          <p class="navy-text font-semibold text-sm truncate">${h.topic}</p>
+          <div class="flex justify-between items-center mt-1">
+            <span class="tag">${h.depth}</span>
+            <span class="text-gray-400 text-xs">${h.timestamp.split(' ')[0]}</span>
+          </div>
+        </div>
+      `).join('');
+    } catch(err) {
+      console.error('History load error:', err);
+    }
+  }
+
+  async function loadHistoryItem(id) {
+    try {
+      const res = await fetch('/history/' + id);
+      const data = await res.json();
+      currentReport = data.report;
+      currentTopic = data.topic;
+      document.getElementById('topic-input').value = data.topic;
+      displayResult(data);
+    } catch(err) {
+      console.error('Error loading history item:', err);
+    }
+  }
+
+  async function clearHistory() {
+    if (!confirm('Clear all research history?')) return;
+    await fetch('/history', { method: 'DELETE' });
+    loadHistory();
+  }
+
+  function copyReport() {
+    navigator.clipboard.writeText(currentReport);
+    alert('Report copied to clipboard!');
+  }
+
+  function downloadReport() {
+    const blob = new Blob([currentReport], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = currentTopic.replace(/\s+/g, '_') + '_research.txt';
+    a.click();
+  }
+
+  // Load history on page load
+  loadHistory();
+</script>
+</body>
+</html>
